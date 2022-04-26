@@ -3,10 +3,11 @@
 #include <string.h>
 #include <dlfcn.h>
 #include <unistd.h>
-#include <sys/types.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
+#include <openssl/bio.h>
+#include <openssl/ssl.h>
 
 int is_ascii_text(const void *buf, size_t len) {
     int result = 1;
@@ -118,12 +119,38 @@ ssize_t read(int fd, void *buf, size_t count) {
     original_read = dlsym(RTLD_NEXT, "read");
     ssize_t bytes = (*original_read)(fd, buf, count);
 
-    if (bytes != -1) {
+    if (bytes > 0) {
         dprintf(STDERR_FILENO, "file descriptor %d read %ld bytes.\n", fd, bytes);
         print(buf, bytes);
     } else {
         dprintf(STDERR_FILENO, "file descriptor %d read failed.\n", fd);
     }
 
+    return bytes;
+}
+
+int SSL_read(SSL *ssl, void *buf, int num) {
+    int (*om)(SSL *, void *, int);
+    om = dlsym(RTLD_NEXT, "SSL_read");
+    int bytes = (om)(ssl, buf, num);
+    if (bytes > 0) {
+        dprintf(STDERR_FILENO, "SSL_read %d bytes.\n", bytes);
+        print(buf, bytes);
+    } else {
+        dprintf(STDERR_FILENO, "SSL_read %d bytes.\n", bytes);
+    }
+    return bytes;
+}
+
+int SSL_write(SSL *ssl, const void *buf, int num) {
+    int (*om)(SSL *, const void *, int);
+    om = dlsym(RTLD_NEXT, "SSL_write");
+    int bytes = (om)(ssl, buf, num);
+    if (bytes > 0) {
+        dprintf(STDERR_FILENO, "SSL_write %d bytes.\n", bytes);
+        print(buf, bytes);
+    } else {
+        dprintf(STDERR_FILENO, "SSL_write %d bytes.\n", bytes);
+    }
     return bytes;
 }
